@@ -38,13 +38,13 @@ def save_barcode_image(barcode_number):
     return result, ean.get_fullcode()
 
 def save_activation(barcode_number, voucher_codes):
-    """Append activation record to activations.json"""
-    if not os.path.exists(ACTIVATION_LOG):
-        with open(ACTIVATION_LOG, "w", encoding="utf-8") as f:
-            json.dump([], f)
+    os.makedirs("data", exist_ok=True)
 
-    with open(ACTIVATION_LOG, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(ACTIVATION_LOG, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = []
 
     data.append({
         "barcode": barcode_number,
@@ -54,6 +54,9 @@ def save_activation(barcode_number, voucher_codes):
 
     with open(ACTIVATION_LOG, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+
+    print("Activation saved:", barcode_number, voucher_codes)
+
 
 def main(page: ft.Page):
     page.title = "CDC Voucher Activation"
@@ -165,6 +168,7 @@ def main(page: ft.Page):
     go_home()
 
 if __name__ == "__main__": 
+    #ft.app(target=main, view=ft.AppView.WEB_BROWSER)
     port = int(os.environ.get("PORT", 8080)) 
     ft.app(target=main, view=ft.AppView.WEB, port=port)
 
