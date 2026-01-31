@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Registration Result</title>
+</head>
+<body>
+
+<h2>Registration Result</h2>
+
+{% if error %}
+  <p style="color:red;"><b>Error:</b> {{ error }}</p>
+  <a href="/">Back</a>
+{% else %}
+
+  <p><b>FIN:</b> {{ fin }}</p>
+
+  {% if already_registered %}
+    <p style="color:blue;"><b>Already registered.</b> Your Household ID is:</p>
+    <h3>{{ household_id }}</h3>
+  {% else %}
+    <p style="color:green;"><b>Registration successful.</b> Your Household ID is:</p>
+    <h3>{{ household_id }}</h3>
+  {% endif %}
+
+  <a href="/">Back</a>
+
+{% endif %}
+
+</body>
+</html>
