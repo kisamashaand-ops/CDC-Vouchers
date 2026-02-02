@@ -1,7 +1,5 @@
-from flask import Flask, request, render_template
+import flet as ft
 from data_structure import HouseholdRegistry
-
-app = Flask(__name__)
 
 # One registry instance (in-memory + persistence)
 registry = HouseholdRegistry(
@@ -11,22 +9,43 @@ registry = HouseholdRegistry(
     voucher_counts={2: 80, 5: 32, 10: 45}
 )
 
-@app.route("/")
-def home():
-    return render_template("household_register.html")
+def main(page: ft.Page):
+    page.title = "Household Registration"
+    page.scroll = "adaptive"
 
-@app.route("/household_registration", methods=["POST"])
-def household_registration():
-    fin_raw = request.form.get("fin", "")
-    fin, household_id, already_registered, error = registry.register_household(fin_raw)
+    # Input field for FIN
+    fin_input = ft.TextField(label="Enter FIN", width=300)
+    result_text = ft.Text(value="", selectable=True)
 
-    return render_template(
-        "household_regi_result.html",
-        fin=fin,
-        household_id=household_id,
-        already_registered=already_registered,
-        error=error
+    def register_household(e):
+        fin_raw = fin_input.value.strip()
+        fin, household_id, already_registered, error = registry.register_household(fin_raw)
+
+        if error:
+            result_text.value = f"Error: {error}"
+        elif already_registered:
+            result_text.value = f"Household with FIN {fin} is already registered. ID: {household_id}"
+        else:
+            result_text.value = f"Successfully registered FIN {fin}. Household ID: {household_id}"
+
+        page.update()
+
+    # Registration button
+    register_button = ft.ElevatedButton("Register Household", on_click=register_household)
+
+    # Layout
+    page.add(
+        ft.Column(
+            controls=[
+                ft.Text("Household Registration Portal", size=20, weight="bold"),
+                fin_input,
+                register_button,
+                result_text
+            ],
+            alignment="start",
+            spacing=20
+        )
     )
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# Run the Flet app
+ft.app(target=main)
