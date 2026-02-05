@@ -24,29 +24,37 @@ ALLOWED_BANKS = {
     "Bank of China Singapore",
 }
 
-def normalize_branch_code(branch_code: str) -> str:
-    bc = (branch_code or "").strip()
-    return bc.zfill(3) if bc.isdigit() else bc
-
 def ensure_csv_exists_with_header():
     if not os.path.exists(CSV_FILENAME):
         with open(CSV_FILENAME, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=CSV_HEADERS)
             writer.writeheader()
 
-def find_existing_merchant_id(merchant_name: str, account_number: str) -> str | None:
+def find_existing_merchant(bank_name: str, account_number: str,
+                           merchant_name: str, account_holder: str) -> tuple[str | None, bool]:
+    """
+    Returns (Merchant_ID, exact_match_flag).
+    - Merchant_ID if any merchant has same bank+account.
+    - exact_match_flag True if all fields match (name, bank, account, holder).
+    """
     if not os.path.exists(CSV_FILENAME):
-        return None
-    name_key = merchant_name.strip().lower()
-    acct_key = account_number.strip()
+        return None, False
+
     with open(CSV_FILENAME, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            existing_name = (row.get("Merchant_Name") or "").strip().lower()
+            existing_bank = (row.get("Bank_Name") or "").strip()
             existing_acct = (row.get("Account_Number") or "").strip()
-            if existing_name == name_key or existing_acct == acct_key:
-                return (row.get("Merchant_ID") or "").strip() or None
-    return None
+            if existing_bank == bank_name and existing_acct == account_number:
+                existing_id = (row.get("Merchant_ID") or "").strip() or None
+                # Check full match
+                same_name = (row.get("Merchant_Name") or "").strip().lower() == merchant_name.lower()
+                same_holder = (row.get("Account_Holder_Name") or "").strip().lower() == account_holder.lower()
+                if same_name and same_holder:
+                    return existing_id, True
+                else:
+                    return existing_id, False
+    return None, False
 
 def get_next_merchant_id() -> str:
     ensure_csv_exists_with_header()
@@ -68,9 +76,10 @@ def append_to_csv(row: dict):
 def main(page: ft.Page):
     page.title = "Merchant Registration"
     page.scroll = "adaptive"
+    page.bgcolor = ft.Colors.BLUE_50   # soft background
 
     # Input fields
-    merchant_name = ft.TextField(label="Merchant Name", width=400)
+    merchant_name = ft.TextField(label="Merchant Name", width=400, bgcolor=ft.Colors.WHITE, border_radius=8)
     bank_name = ft.Dropdown(
         label="Bank Name",
         options=[ft.dropdown.Option(b) for b in sorted(ALLOWED_BANKS)],
@@ -79,11 +88,13 @@ def main(page: ft.Page):
     account_number = ft.TextField(
         label="Account Number (9 digits)",
         width=400,
-        max_length=9
+        max_length=9,
+        bgcolor=ft.Colors.WHITE,
+        border_radius=8
     )
-    account_holder = ft.TextField(label="Account Holder Name", width=400)
+    account_holder = ft.TextField(label="Account Holder Name", width=400, bgcolor=ft.Colors.WHITE, border_radius=8)
 
-    result_text = ft.Text(value="", selectable=True, color="blue")
+    result_text = ft.Text(value="", selectable=True, size=16)
 
     def register_clicked(e):
         m_name = merchant_name.value.strip()
@@ -94,14 +105,22 @@ def main(page: ft.Page):
         # Validation
         if b_name not in ALLOWED_BANKS:
             result_text.value = "❌ Invalid Bank Name."
+            result_text.color = ft.Colors.RED
         elif not (acct_num.isdigit() and len(acct_num) == 9):
             result_text.value = "❌ Account Number must be exactly 9 digits."
+            result_text.color = ft.Colors.RED
         elif not all([m_name, b_name, acct_num, acct_holder]):
             result_text.value = "❌ All fields are required."
+            result_text.color = ft.Colors.RED
         else:
-            existing_id = find_existing_merchant_id(m_name, acct_num)
+            existing_id, exact_match = find_existing_merchant(b_name, acct_num, m_name, acct_holder)
             if existing_id:
-                result_text.value = f"⚠️ Already Registered. Merchant_ID: {existing_id}"
+                if exact_match:
+                    result_text.value = f"⚠️ Already registered. Merchant_ID: {existing_id}"
+                    result_text.color = ft.Colors.ORANGE
+                else:
+                    result_text.value = "⚠️ Please double check the information you entered."
+                    result_text.color = ft.Colors.ORANGE
             else:
                 merchant_id = get_next_merchant_id()
                 row = {
@@ -113,15 +132,23 @@ def main(page: ft.Page):
                 }
                 append_to_csv(row)
                 result_text.value = f"✅ Registered successfully. Merchant_ID: {merchant_id}"
+                result_text.color = ft.Colors.GREEN
 
         page.update()
 
-    register_button = ft.ElevatedButton("Submit", on_click=register_clicked)
+    register_button = ft.ElevatedButton(
+        "Submit",
+        on_click=register_clicked,
+        bgcolor=ft.Colors.BLUE,
+        color=ft.Colors.WHITE,
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
+    )
 
-    page.add(
-        ft.Column(
+    # Card-style container
+    card = ft.Container(
+        content=ft.Column(
             controls=[
-                ft.Text("Merchant Registration", size=22, weight="bold"),
+                ft.Text("🏦 Merchant Registration Portal", size=26, weight="bold", color=ft.Colors.BLUE_900),
                 merchant_name,
                 bank_name,
                 account_number,
@@ -129,7 +156,20 @@ def main(page: ft.Page):
                 register_button,
                 result_text
             ],
-            spacing=15
+            alignment="center",
+            spacing=20
+        ),
+        bgcolor=ft.Colors.WHITE,
+        border_radius=12,
+        padding=30,
+        shadow=ft.BoxShadow(blur_radius=12, color=ft.Colors.BLUE_GREY_200)
+    )
+
+    # Center everything
+    page.add(
+        ft.Row(
+            controls=[card],
+            alignment="center"
         )
     )
 

@@ -11,7 +11,7 @@ class HouseholdRegistry:
     """
 
     # Singapore NRIC/FIN format: prefix S/T/F/G, 7 digits, checksum letter
-    FIN_NRIC_PATTERN = re.compile(r"^[STFG]\d{7}[A-Z]$")
+    FIN_NRIC_PATTERN = re.compile(r"^[STFGM]\d{7}[A-Z]$")
 
     def __init__(self,
                  data_dir="data",
@@ -93,13 +93,40 @@ class HouseholdRegistry:
             if hid not in self.household_voucher_state:
                 self.init_voucher_state(hid)
 
+    @staticmethod
+    def format_voucher_code(household_id: str, denom: int, idx: int) -> str:
+        """
+        Deterministic, reversible voucher code.
+        Example: V02-0001-H0001
+        denom: 2/5/10
+        idx: 1-based index within denom pool for the household
+        """
+        return f"V{denom:02d}-{idx:04d}-{household_id}"
+
+    @staticmethod
+    def parse_voucher_code(code: str) -> tuple[str, int, int]:
+        """
+        Reverse of format_voucher_code.
+        Input: V02-0001-H0001
+        Output: (household_id, denom, idx)
+        """
+        parts = code.strip().split("-")
+        if len(parts) != 3 or not parts[0].startswith("V"):
+            raise ValueError("Invalid voucher code format. Expected: V02-0001-H0001")
+
+        denom = int(parts[0][1:])
+        idx = int(parts[1])
+        household_id = parts[2]
+        return household_id, denom, idx
+    
+
     # ---------- Main API ----------
     def register_household(self, fin_raw: str):
         fin = self.normalize_fin(fin_raw)
         if not fin:
-            return "", "", False, "FIN/NRIC is required."
+            return "", "", False, "An ID (NRIC or FIN) is required."
         if not self.is_valid_fin_or_nric(fin):
-            return fin, "", False, "Invalid FIN/NRIC format."
+            return fin, "", False, "Invalid ID format. Please enter a valid NRIC or FIN."
 
         # Existing
         if fin in self.fin_to_household:

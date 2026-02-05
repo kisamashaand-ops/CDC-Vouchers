@@ -77,6 +77,15 @@ def main(page: ft.Page):
         page.update()
 
     def login(e):
+        # Re-initialize registry from files each time login is attempted
+        global registry
+        registry = HouseholdRegistry(
+            data_dir="data",
+            households_csv="households.csv",
+            voucher_state_json="voucher_state.json",
+            voucher_counts={2: 80, 5: 32, 10: 45}
+        )
+
         hid = (household_id_input.value or "").strip()
         if not hid or hid not in registry.household_voucher_state:
             message.value = "Invalid Household ID."
@@ -85,6 +94,7 @@ def main(page: ft.Page):
 
         message.value = ""
         show_voucher_grid(hid)
+
 
     def show_voucher_grid(hid):
         page.controls.clear()
